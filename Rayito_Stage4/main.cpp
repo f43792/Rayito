@@ -85,12 +85,15 @@ Ray makeCameraRay(float fieldOfViewInDegrees,
 
 
 // TODO: these should probably be read in as commandline parameters.
-const size_t kWidth = 512;
-const size_t kHeight = 512;
-const size_t kNumPixelSamplesU = 4;
-const size_t kNumPixelSamplesV = 4;
-const size_t kNumLightSamplesU = 4;
-const size_t kNumLightSamplesV = 4;
+const size_t masterSize = 512;
+const size_t kWidth = masterSize;
+const size_t kHeight = masterSize;
+const size_t masterPixelSamples = 4;
+const size_t masterLightSamples = 4;
+const size_t kNumPixelSamplesU = masterPixelSamples;
+const size_t kNumPixelSamplesV = masterPixelSamples;
+const size_t kNumLightSamplesU = masterLightSamples;
+const size_t kNumLightSamplesV = masterLightSamples;
 
 
 Color trace(const Ray& ray, ShapeSet& scene, std::list<Shape*>& lights, Rng& rng, size_t lightSamplesHint)
@@ -178,6 +181,9 @@ int main(int argc, char **argv)
     time_t start, stop;
     long elapsed;
     start = clock();
+    printf("Total samples: %ld.\nImage Size (%ldx%ld).\n", masterPixelSamples*masterPixelSamples,
+           masterSize,
+           masterSize);
     printf("Rendering...");
 
     // Change these to suit yourself, or as an exercise grab them from the commandline

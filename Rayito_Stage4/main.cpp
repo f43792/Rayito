@@ -30,17 +30,17 @@ std::ostream& operator <<(std::ostream& stream, const Vector& v)
 struct Rng
 {
     unsigned int m_z, m_w;
-    
+
     Rng(unsigned int z = 362436069, unsigned int w = 521288629) : m_z(z), m_w(w) { }
-    
-    
+
+
     // Returns a 'canonical' float from [0,1)
     float nextFloat()
     {
         unsigned int i = nextUInt32();
         return i * 2.328306e-10f;
     }
- 
+
     // Returns an int with random bits set
     unsigned int nextUInt32()
     {
@@ -62,10 +62,10 @@ Ray makeCameraRay(float fieldOfViewInDegrees,
     Vector forward = (target - origin).normalized();
     Vector right = cross(forward, targetUpDirection).normalized();
     Vector up = cross(right, forward).normalized();
-    
+
     // Convert to radians, as that is what the math calls expect
     float tanFov = std::tan(fieldOfViewInDegrees * M_PI / 180.0f);
-    
+
     Ray ray;
 
     // Set up ray info
@@ -74,7 +74,7 @@ Ray makeCameraRay(float fieldOfViewInDegrees,
                       right * ((xScreenPos0To1 - 0.5f) * tanFov) +
                       up * ((yScreenPos0To1 - 0.5f) * tanFov);
     ray.m_direction.normalize();
-    
+
     return ray;
 }
 
@@ -96,7 +96,7 @@ const size_t kNumLightSamplesV = 4;
 Color trace(const Ray& ray, ShapeSet& scene, std::list<Shape*>& lights, Rng& rng, size_t lightSamplesHint)
 {
     Color result = Color(0.0f, 0.0f, 0.0f);
-    
+
     // Trace the initial ray to see if we hit anything
     Intersection intersection(ray);
     if (!scene.intersect(intersection))
@@ -104,13 +104,13 @@ Color trace(const Ray& ray, ShapeSet& scene, std::list<Shape*>& lights, Rng& rng
         // No hit, return black (background)
         return result;
     }
-    
+
     const size_t numLightSamplesU = lightSamplesHint;
     const size_t numLightSamplesV = lightSamplesHint;
-    
+
     // Add in emission at intersection
     result += intersection.m_pMaterial->emittance();
-    
+
     // Find out what lights the intersected point can see
     Point position = intersection.position();
     for (std::list<Shape*>::iterator iter = lights.begin();
@@ -133,7 +133,7 @@ Color trace(const Ray& ray, ShapeSet& scene, std::list<Shape*>& lights, Rng& rng
                                            position,
                                            lightPoint,
                                            lightNormal);
-                
+
                 // Fire a shadow ray to make sure we can actually see
                 // that light position
                 Vector toLight = lightPoint - position;
@@ -141,7 +141,7 @@ Color trace(const Ray& ray, ShapeSet& scene, std::list<Shape*>& lights, Rng& rng
                 Ray shadowRay(position, toLight, lightDistance - kRayTMin);
                 Intersection shadowIntersection(shadowRay);
                 bool intersected = scene.intersect(shadowIntersection);
-                
+
                 if (!intersected || shadowIntersection.m_pShape == pLightShape)
                 {
                     // The light point is visible, so let's add that
@@ -156,45 +156,59 @@ Color trace(const Ray& ray, ShapeSet& scene, std::list<Shape*>& lights, Rng& rng
             }
         }
         lightResult /= numLightSamplesU * numLightSamplesV;
-        
+
         result += lightResult;
     }
-    
+
     return result;
 }
 
+long timediff(clock_t t1, clock_t t2) {
+    long elapsed;
+    elapsed = ((double)t2 - t1) / CLOCKS_PER_SEC * 1000;
+    return elapsed;
+}
 
+//=============================================================================
+//==== MAIN ===================================================================
+//=============================================================================
 int main(int argc, char **argv)
 {
+    setbuf(stdout, NULL);
+    time_t start, stop;
+    long elapsed;
+    start = clock();
+    printf("Rendering...");
+
     // Change these to suit yourself, or as an exercise grab them from the commandline
     size_t pixelSamplesHint = 4;
     size_t lightSamplesHint = 4;
-    
+
     // Available materials
     Lambert blueishLambert(Color(0.9f, 0.9f, 1.0f));
     Lambert purplishLambert(Color(0.9f, 0.7f, 0.8f));
     Phong greenishPhong(Color(0.7f, 0.9f, 0.7f), 16.0f);
-    
+
     // The 'scene'
     ShapeSet masterSet;
-    
+
     // Put a ground plane in (with bullseye texture!)
     Plane plane(Point(0.0f, -2.0f, 0.0f),
                 Vector(0.0f, 1.0f, 0.0f),
                 &blueishLambert,
                 true);
     masterSet.addShape(&plane);
-    
+
     Sphere sphere1(Point(3.0f, -1.0f, 0.0f),
                    1.0f,
                    &purplishLambert);
     masterSet.addShape(&sphere1);
-    
+
     Sphere sphere2(Point(-3.0f, 0.0f, -2.0f),
                    2.0f,
                    &greenishPhong);
     masterSet.addShape(&sphere2);
-    
+
     // Add an area light
     RectangleLight areaLight(Point(-2.5f, 4.0f, -2.5f),
                              Vector(5.0f, 0.0f, 0.0f),
@@ -208,15 +222,15 @@ int main(int argc, char **argv)
                           &blueishLambert);
     ShapeLight sphereLight(&sphereForLight, Color(1.0f, 1.0f, 0.1f), 4.0f);
     masterSet.addShape(&sphereLight);
-    
+
     // Get light list from the scene
     std::list<Shape*> lights;
     masterSet.findLights(lights);
-    
+
     // Random number generator (for random pixel positions, light positions, etc)
     Rng rng;
-    
-    
+
+
     // Set up the output file (TODO: the filename should probably be a commandline parameter)
     std::ostringstream headerStream;
 #if WRITE_PFM
@@ -231,7 +245,7 @@ int main(int argc, char **argv)
     std::ofstream fileStream("out.ppm", std::ios::out | std::ios::binary);
 #endif
     fileStream << headerStream.str();
-    
+
     // For each row...
     for (size_t y = 0; y < kHeight; ++y)
     {
@@ -249,7 +263,7 @@ int main(int argc, char **argv)
                     // bottom up.  Flip pixel row to be in screen space.
                     float yu = 1.0f - ((y + (vsi + rng.nextFloat()) / float(kNumPixelSamplesV)) / float(kHeight));
                     float xu = (x + (usi + rng.nextFloat()) / float(kNumPixelSamplesU)) / float(kWidth);
-                    
+
                     // Find where this pixel sample hits in the scene
                     Ray ray = makeCameraRay(45.0f,
                                             Point(0.0f, 5.0f, 15.0f),
@@ -257,13 +271,13 @@ int main(int argc, char **argv)
                                             Point(0.0f, 1.0f, 0.0f),
                                             xu,
                                             yu);
-                    
+
                     pixelColor += trace(ray, masterSet, lights, rng, lightSamplesHint);
                 }
             }
             // Divide by the number of pixel samples (a box filter, essentially)
             pixelColor /= pixelSamplesHint * pixelSamplesHint;
-            
+
 #if WRITE_PFM
             fileStream << pixelColor.m_r << pixelColor.m_g << pixelColor.m_b;
 #else
@@ -278,11 +292,14 @@ int main(int argc, char **argv)
 #endif
         }
     }
-    
+
     // Tidy up (probably unnecessary)
     fileStream.flush();
     fileStream.close();
-    
+
+    stop = clock();
+    elapsed = timediff(start, stop);
+    printf("done (%ld ms).\n", elapsed);
+
     return 0;
 }
-
